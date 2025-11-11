@@ -4,7 +4,6 @@ langchain-core
 langchain-google-genai
 langchain-huggingface
 langchain-community
-langchain-chroma
 langchain-text-splitters
 langchainhub
 google-generativeai
@@ -12,3 +11,5 @@ sentence-transformers
 chromadb
 pypdf
 python-dotenv
+requests
+beautifulsoup4

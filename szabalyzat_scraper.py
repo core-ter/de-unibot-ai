@@ -3,93 +3,78 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 
-# --- Beállítások ---
+# Target URL
+BASE_URL = "https://unideb.hu/szabalyzatok" 
 
-# Az URL, ahonnan a szabályzatokat szeretnéd letölteni
-URL = "https://unideb.hu/szabalyzatok" 
+# Relative path based on the script's location
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DOWNLOAD_DIR = os.path.join(SCRIPT_DIR, "szabalyzatok")
 
-# A mappa neve, ahova a letöltött PDF-eket menteni szeretnéd
-# Ez a mappa létrejön a szkript futtatási helyén, ha még nem létezik.
-LETOLTESI_MAPPA = r"E:\Munka\unibot_ai\szabalyzatok"
-
-# --- Kód ---
-
-def letolt_szabalyzatok(url, mappa):
-    """
-    Letölti az összes PDF linket a megadott URL-ről a megadott mappába.
-    """
-    print(f"Weboldal lekérése: {url}")
+def fetch_pdfs(url, folder):
+    """Downloads all PDFs to the target folder."""
+    
+    print(f"Parsing page: {url}")
     try:
-        response = requests.get(url, timeout=30) # 30 másodperc timeout
-        response.raise_for_status() # Hibát dob, ha a lekérés sikertelen (pl. 404)
-        response.encoding = response.apparent_encoding # Próbálja kitalálni a helyes karakterkódolást
-        
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        response.encoding = response.apparent_encoding
     except requests.exceptions.RequestException as e:
-        print(f"Hiba a weboldal lekérése közben: {e}")
+        print(f"Error (page unreachable?): {e}")
         return
 
     soup = BeautifulSoup(response.text, 'html.parser')
 
-    # Mappa létrehozása, ha nem létezik
-    if not os.path.exists(mappa):
-        print(f"Létrehozom a mappát: '{mappa}'")
-        os.makedirs(mappa)
+    # Create folder
+    os.makedirs(folder, exist_ok=True)
 
-    pdf_linkek = []
-    # Az összes link ('a' tag) megkeresése
+    links_to_download = []
     for link in soup.find_all('a', href=True):
         href = link['href']
-        # Csak azokat vesszük figyelembe, amik '.pdf'-re végződnek (kis/nagybetű érzéketlen)
         if href.lower().endswith('.pdf'):
-            # Teljes URL létrehozása (kezeli a relatív linkeket is)
-            teljes_url = urljoin(url, href)
-            pdf_linkek.append(teljes_url)
+            full_url = urljoin(url, href)
+            links_to_download.append(full_url)
 
-    if not pdf_linkek:
-        print("Nem találtam PDF linkeket az oldalon.")
+    if not links_to_download:
+        print("No PDF links found on the page.")
         return
 
-    print(f"Összesen {len(pdf_linkek)} PDF link található.")
+    print(f"Found {len(links_to_download)} total PDFs. Starting download...")
     
-    letoltott_db = 0
-    hibas_db = 0
+    dl_count = 0
+    fail_count = 0
 
-    for pdf_url in pdf_linkek:
-        # A fájlnév kinyerése az URL végéről
-        fajlnev = pdf_url.split('/')[-1]
-        cel_utvonal = os.path.join(mappa, fajlnev)
+    for pdf_url in links_to_download:
+        try:
+            filename = pdf_url.split('/')[-1].split('?')[0]
+        except Exception:
+            print(f"Invalid URL, skipping: {pdf_url}")
+            continue
+            
+        target_path = os.path.join(folder, filename)
 
-        # Ha a fájl már létezik, kihagyjuk (opcionális, de hasznos)
-        if os.path.exists(cel_utvonal):
-            print(f"Kihagyva (már létezik): {fajlnev}")
+        if os.path.exists(target_path):
+            print(f"Already exists: {filename}")
             continue
 
-        print(f"Letöltés indul: {fajlnev} innen: {pdf_url}")
+        print(f"Saving: {filename}...")
         try:
-            pdf_response = requests.get(pdf_url, stream=True, timeout=60) # Hosszabb timeout letöltéshez
+            pdf_response = requests.get(pdf_url, stream=True, timeout=60)
             pdf_response.raise_for_status()
 
-            # Fájl írása darabokban (nagy fájlok esetén is működik)
-            with open(cel_utvonal, 'wb') as f:
+            with open(target_path, 'wb') as f:
                 for chunk in pdf_response.iter_content(chunk_size=8192): 
                     f.write(chunk)
             
-            print(f"Sikeres letöltés: {fajlnev}")
-            letoltott_db += 1
+            dl_count += 1
 
         except requests.exceptions.RequestException as e:
-            print(f"!!! Hiba a letöltés közben ({fajlnev}): {e}")
-            hibas_db += 1
-        except Exception as e:
-             print(f"!!! Váratlan hiba ({fajlnev}): {e}")
-             hibas_db += 1
+            print(f"!!! Error ({filename}): {e}")
+            fail_count += 1
 
+    print("\n" + "="*20)
+    print(f"Done. Successful: {dl_count}, Failed: {fail_count}.")
+    print(f"Folder: {os.path.abspath(folder)}")
+    print("="*20)
 
-    print("\n--- Összegzés ---")
-    print(f"Sikeresen letöltve: {letoltott_db} fájl")
-    print(f"Hibás letöltések: {hibas_db} fájl")
-    print(f"Letöltési mappa: '{os.path.abspath(mappa)}'")
-
-# --- A szkript futtatása ---
 if __name__ == "__main__":
-    letolt_szabalyzatok(URL, LETOLTESI_MAPPA)
+    fetch_pdfs(BASE_URL, DOWNLOAD_DIR)
