@@ -1,0 +1,54 @@
+# ######################## #
+#  Python Best Practices   #
+# ######################## #
+
+# Virtual Environments
+# A virtuális környezetet soha nem töltjük fel.
+.venv/
+venv/
+ENV/
+env/
+
+# Python cache files
+# A lefordított Python fájlok (gyorsítótár)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python egg/distribution files
+# Csomagolásból maradt fájlok
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# ######################## #
+#  Project-Specific Files  #
+# ######################## #
+
+# Secret files
+# Titkos API kulcsok és környezeti változók
+.env
+
+# Generated Data / Databases
+# A program által futás közben generált adatbázis
+chroma_db/
+
+# Scraped Data
+# A scraper által letöltött adatok (ezeket a scraper futtatásával kell beszerezni)
+szabalyzatok/
+
+# ######################## #
+#  IDE / Editor / OS Files #
+# ######################## #
+
+# VS Code
+.vscode/
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# macOS
+.DS_Store
