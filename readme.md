@@ -1,9 +1,3 @@
-<div align="center">
-  <a href="#hu" style="text-decoration:none; padding: 10px 20px; margin: 5px; background-color: #2a4a2a; color: #98fb98; border: 1px solid #50e050; border-radius: 5px; font-weight: bold;">🇭🇺 Magyar Dokumentáció</a>
-  <a href="#en" style="text-decoration:none; padding: 10px 20px; margin: 5px; background-color: #4a4a2a; color: #f0e68c; border: 1px solid #e0c050; border-radius: 5px; font-weight: bold;">🇬🇧 English Documentation</a>
-</div>
-<br>
-
 <a name="hu"></a>
 
 # 🎓 Unibot - RAG Chatbot a Debreceni Egyetemhez
@@ -167,7 +161,7 @@ Javaslatokat, hibákat és pull requesteket szívesen fogadok! Nyiss egy issue-t
 
 ---
 
-**Készítette:** Fenti  
+**Készítette:** Magos Vilmos
 **Egyetem:** Debreceni Egyetem  
 **Projekt típus:** RAG-alapú AI Chatbot  
 **GitHub Topics:** `rag` `chatbot` `langchain` `streamlit` `ai` `gemini` `chromadb` `python`

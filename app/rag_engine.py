@@ -6,48 +6,36 @@ from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader
 from langchain_chroma import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
-
-# --- JAVÍTÁS: ---
-# 'from app import config' HELYETT sima 'import config'
-# Mivel egy mappában vannak, így látják egymást.
 import config
 
 def format_docs(docs: List[Document]) -> str:
-    """Segédfüggvény a dokumentumok szövegének összefűzésére."""
+    # Join docs with separator
     return "\n\n---\n\n".join(doc.page_content for doc in docs)
 
 def get_embedding_model() -> HuggingFaceEmbeddings:
-    """Betölti a konfigurált embedding modellt."""
     return HuggingFaceEmbeddings(model_name=config.EMBEDDING_MODEL_NAME)
 
 def get_llm() -> ChatGoogleGenerativeAI:
-    """Inicializálja a Gemini modellt a configban lévő kulccsal."""
     if not config.GOOGLE_API_KEY:
-        raise ValueError("A GOOGLE_API_KEY nincs beállítva a .env fájlban!")
+        raise ValueError("Missing GOOGLE_API_KEY in .env")
+        
     return ChatGoogleGenerativeAI(
         model=config.GENERATIVE_MODEL_NAME, 
         temperature=config.LLM_TEMPERATURE
     )
 
 def build_or_load_vectorstore() -> Chroma:
-    """
-    Létrehozza vagy betölti a vektoradatbázist.
-    A config.VEKTOR_DB_MAPPA határozza meg a mentés helyét.
-    """
+    # Load or create vector DB
     embeddings = get_embedding_model()
 
-    # Ellenőrizzük, hogy létezik-e már az adatbázis
+    # Check if DB exists and has files
     if not os.path.exists(config.VEKTOR_DB_MAPPA) or not os.listdir(config.VEKTOR_DB_MAPPA):
-        print(f"Vektor adatbázis nem található itt: {config.VEKTOR_DB_MAPPA}")
+        print(f"DB not found at {config.VEKTOR_DB_MAPPA}, creating new...")
         
-        # Ellenőrizzük, hogy van-e adat
         if not os.path.exists(config.PDF_DATA_PATH):
-             raise FileNotFoundError(
-                 f"A '{config.PDF_DATA_PATH}' mappa nem található! "
-                 "Futtasd le a scrapert először."
-             )
+             raise FileNotFoundError(f"Data folder missing: {config.PDF_DATA_PATH}")
 
-        # Használjuk a use_multithreading=False beállítást, ha a konzol teleszemetelése zavaró
+        # Load PDFs
         loader = DirectoryLoader(
             config.PDF_DATA_PATH, 
             glob="*.pdf", 
@@ -59,20 +47,23 @@ def build_or_load_vectorstore() -> Chroma:
         docs = loader.load()
         
         if not docs:
-            raise ValueError(f"Nincs feldolgozható PDF fájl a '{config.PDF_DATA_PATH}' mappában!")
+            raise ValueError("No PDFs found to index!")
 
-        text_splitter = RecursiveCharacterTextSplitter(
+        # Split text
+        splitter = RecursiveCharacterTextSplitter(
             chunk_size=config.CHUNK_SIZE, 
             chunk_overlap=config.CHUNK_OVERLAP
         )
-        splits = text_splitter.split_documents(docs)
+        splits = splitter.split_documents(docs)
 
+        # Create DB
         vectorstore = Chroma.from_documents(
             documents=splits, 
             embedding=embeddings, 
             persist_directory=config.VEKTOR_DB_MAPPA
         )
     else:
+        # Load existing DB
         vectorstore = Chroma(
             persist_directory=config.VEKTOR_DB_MAPPA, 
             embedding_function=embeddings

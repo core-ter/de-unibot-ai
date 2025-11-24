@@ -37,7 +37,7 @@ chroma_db/
 
 # Scraped Data
 # A scraper által letöltött adatok (ezeket a scraper futtatásával kell beszerezni)
-szabalyzatok/
+data/
 
 # ######################## #
 #  IDE / Editor / OS Files #

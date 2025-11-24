@@ -1,123 +1,102 @@
 import streamlit as st
 import textwrap
-
-# Itt importáljuk a modulokat az 'app' csomagból
-# Ez akkor működik, ha a projekt gyökeréből futtatod a 'streamlit run app/main.py' parancsot
 import config
 import rag_engine
 
-# --- Page Configuration ---
+# Page setup
 st.set_page_config(
     page_title="Unibot - Debreceni Egyetem",
     page_icon="🎓",
-    layout="centered",
-    initial_sidebar_state="collapsed",
+    layout="centered"
 )
 
-# --- Custom CSS ---
-custom_css = """
-<style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    body { background-color: #1a1a1a; color: #e0e0e0; }
-    .stApp { background-color: #1a1a1a; }
-    .main-header { color: #50e050; text-align: center; font-size: 2.2rem; font-weight: bold; margin-bottom: 0.5rem; padding-top: 1rem; }
-    .stCaption { color: #888888; text-align: center; }
-    .stChatMessage { border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1rem; border: 1px solid #444; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-    [data-testid="stChatMessage"][aria-label="human"] { background-color: #3a3a2a; border-color: #e0c050; }
-    [data-testid="stChatMessage"][aria-label="human"] p { color: #f0e68c; }
-    [data-testid="stChatMessage"][aria-label="assistant"] { background-color: #2a4a2a; border-color: #50e050; }
-    [data-testid="stChatMessage"][aria-label="assistant"] p { color: #98fb98; }
-    [data-testid="stChatMessage"][aria-label="assistant"] .stSpinner > div { border-top-color: #50e050; }
-    .stSpinner { color: #98fb98; }
-    [data-testid="stChatInput"] button { background-color: #50e050; color: #1a1a1a; border: none; border-radius: 8px; }
-    [data-testid="stChatInput"] button:hover { background-color: #98fb98; color: #1a1a1a; }
-</style>
-"""
-st.markdown(custom_css, unsafe_allow_html=True)
+# Custom CSS (Dark mode)
+st.markdown("""
+    <style>
+    .stApp { background-color: #0e1117; color: #ffffff; }
+    .stChatInput input { background-color: #262730 !important; color: #fff !important; border: 1px solid #4e5d6c !important; }
+    </style>
+""", unsafe_allow_html=True)
 
-# --- Resource Loading (Cached) ---
+# Cache resources to speed up reloads
+@st.cache_resource
+def get_db():
+    return rag_engine.build_or_load_vectorstore()
 
 @st.cache_resource
-def get_vectorstore():
-    try:
-        # Ez a hívás most már a rag_engine-en keresztül a HELYES (gyökér) mappát használja
-        with st.spinner("Tudásbázis betöltése..."):
-            return rag_engine.build_or_load_vectorstore()
-    except Exception as e:
-        st.error(f"Kritikus hiba az adatbázis betöltésekor: {e}")
-        st.stop()
+def get_ai():
+    return rag_engine.get_llm()
 
-@st.cache_resource
-def get_llm_client():
-    try:
-        return rag_engine.get_llm()
-    except Exception as e:
-        st.error(f"LLM hiba: {e}")
-        st.stop()
+# Header
+col1, col2 = st.columns([1, 5])
+with col1:
+    st.image("https://unideb.hu/sites/default/files/upload_documents/de_cimer_sarga_kek_0.png", width=80)
+with col2:
+    st.title("Unibot AI")
+    st.caption("RAG alapú chatbot a Debreceni Egyetem szabályzataihoz")
 
-# --- App Logic ---
-
-st.markdown('<h1 class="main-header">🎓 DE-Unibot</h1>', unsafe_allow_html=True)
-
-vectorstore = get_vectorstore()
-llm = get_llm_client()
+# Init resources
+vectorstore = get_db()
+llm = get_ai()
 retriever = vectorstore.as_retriever(search_kwargs={"k": config.NUM_RETRIEVED_DOCS})
 
+# Chat history
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+# Show history
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.write(msg["content"])
 
-if prompt := st.chat_input("Kérdezz a Debreceni Egyetem szabályzatairól..."):
+# User input
+if prompt := st.chat_input("Kérdezz a szabályzatokról..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
-        st.write(prompt)  # XSS védelem: st.write() escapeli a HTML-t
+        st.write(prompt)
 
     with st.chat_message("assistant"):
-        message_placeholder = st.empty()
+        placeholder = st.empty()
         
         try:
-            with st.spinner("Keresés a szabályzatokban..."):
-                retrieved_docs = retriever.invoke(prompt)
-                context_text = rag_engine.format_docs(retrieved_docs) if retrieved_docs else "(Nincs releváns találat.)"
+            with st.spinner("Keresés..."):
+                # 1. Retrieve docs
+                docs = retriever.invoke(prompt)
+                context = rag_engine.format_docs(docs) if docs else "Nincs infó."
 
-                history_limit = 5
-                relevant_history = st.session_state.messages[-(history_limit*2+1):-1]
-                formatted_history = "\n".join([f"{msg['role']}: {msg['content']}" for msg in relevant_history])
+                # 2. Build prompt
+                # Keep last 5 messages for context
+                history = st.session_state.messages[-11:-1]
+                history_str = "\n".join([f"{m['role']}: {m['content']}" for m in history])
 
-                prompt_template = textwrap.dedent(f"""
-                A te szereped "Unibot", a Debreceni Egyetem segítőkész chatbotja. 
-                Feladatod: segíteni a hallgatóknak a szabályzatokkal kapcsolatban.
-                Legyél kedves, pontos és tömör.
+                template = textwrap.dedent(f"""
+                Te vagy az Unibot, a Debreceni Egyetem segédje.
+                Válaszolj a kérdésre a megadott szabályzatok alapján.
+                Ha nincs infó, mondd meg őszintén.
 
-                Korábbi beszélgetés (utolsó {history_limit} kör):
-                {formatted_history}
+                Előzmények:
+                {history_str}
 
-                Releváns kontextus (elsődleges forrás):
-                {context_text}
+                Szabályzatok (Forrás):
+                {context}
 
                 Kérdés: {prompt}
-
-                Válasz:
                 """)
 
-                response = llm.invoke(prompt_template)
-                full_response = response.content if hasattr(response, 'content') else str(response)
+                # 3. Generate answer
+                resp = llm.invoke(template)
+                ans = resp.content if hasattr(resp, 'content') else str(resp)
 
         except Exception as e:
-            st.error(f"Hiba történt: {e}")
-            full_response = "Sajnálom, technikai hiba történt."
+            st.error(f"Hiba: {e}")
+            ans = "Bocs, valami félrement."
 
-        message_placeholder.write(full_response)  # XSS védelem: st.write() escapeli a HTML-t
+        placeholder.write(ans)
 
-    if "hiba történt" not in full_response.lower():
-        st.session_state.messages.append({"role": "assistant", "content": full_response})
+    # Save answer
+    if "hiba" not in ans.lower():
+        st.session_state.messages.append({"role": "assistant", "content": ans})
         
-        # Memória limit: megakadályozzuk a végtelen növekedést hosszú beszélgetéseknél
-        MAX_STORED_MESSAGES = 50
-        if len(st.session_state.messages) > MAX_STORED_MESSAGES:
-            st.session_state.messages = st.session_state.messages[-MAX_STORED_MESSAGES:]
+        # Limit history to 50 msgs
+        if len(st.session_state.messages) > 50:
+            st.session_state.messages = st.session_state.messages[-50:]
