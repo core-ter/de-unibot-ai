@@ -1,6 +1,4 @@
-<a name="hu"></a>
-
-# 🎓 Unibot - RAG Chatbot a Debreceni Egyetemhez
+# Unibot - RAG Chatbot a Debreceni Egyetemhez
 
 ## Projekt Áttekintés
 
@@ -10,7 +8,7 @@ A projekt a **RAG (Retrieval-Augmented Generation)** architektúrát valósítja
 
 A felhasználói felületet a **Streamlit** biztosítja, a chatbot logikát a **LangChain** keretrendszer vezérli, a szemantikus keresést egy lokális **ChromaDB** vektor adatbázis végzi, a válaszok generálásáért pedig a **Google Gemini API** (`gemini-2.5-flash`) felel.
 
-## ⚙️ Technológiai Összetevők (Tech Stack)
+## Technológiai Összetevők (Tech Stack)
 
 * **Felhasználói Felület (UI):** Streamlit
 * **AI Keretrendszer:** LangChain
@@ -20,7 +18,7 @@ A felhasználói felületet a **Streamlit** biztosítja, a chatbot logikát a **
 * **Adatgyűjtés (Scraping):** Python (`requests`, `BeautifulSoup4`)
 * **Dokumentumkezelés:** `pypdf`
 
-## 📂 Repozitórium Struktúra
+## Repozitórium Struktúra
 
 A projekt főbb fájljai és azok funkciói:
 
@@ -33,7 +31,7 @@ A projekt főbb fájljai és azok funkciói:
 * **`.env-example`**: Minta fájl, ami mutatja a felhasználóknak, hogy a `.env` fájlnak milyen változót kell tartalmaznia (pl. `GOOGLE_API_KEY=...`).
 * **`LICENSE`**: MIT License fájl.
 
-## 🚀 Telepítés és Futtatás
+## Telepítés és Futtatás
 
 Az alábbi lépések szükségesek a projekt lokális futtatásához.
 
@@ -86,7 +84,7 @@ Az alkalmazás megnyílik a böngésződben `http://localhost:8501` címen.
 
 ---
 
-## 🏗️ Rendszer Architektúra
+## Rendszer Architektúra
 
 ```mermaid
 graph LR
@@ -110,7 +108,7 @@ graph LR
 
 ---
 
-## 🐛 Hibaelhárítás (Troubleshooting)
+## Hibaelhárítás (Troubleshooting)
 
 ### "GOOGLE_API_KEY not set"
 **Probléma:** Az API kulcs nincs beállítva vagy hibás.  
@@ -148,20 +146,3 @@ python app/utils/scraping.py
 ```
 
 ---
-
-## 📄 Licenc
-
-Ez a projekt [MIT License](LICENSE) alatt érhető el.
-
----
-
-## 🤝 Közreműködés
-
-Javaslatokat, hibákat és pull requesteket szívesen fogadok! Nyiss egy issue-t vagy küldd be a PR-ed.
-
----
-
-**Készítette:** Magos Vilmos
-**Egyetem:** Debreceni Egyetem  
-**Projekt típus:** RAG-alapú AI Chatbot  
-**GitHub Topics:** `rag` `chatbot` `langchain` `streamlit` `ai` `gemini` `chromadb` `python`
