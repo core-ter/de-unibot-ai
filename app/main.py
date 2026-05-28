@@ -1,3 +1,6 @@
+import os
+import subprocess
+import sys
 import streamlit as st
 import textwrap
 import config
@@ -22,6 +25,78 @@ st.markdown("""
 
 
 @st.cache_resource
+def ensure_data_folder() -> bool:
+    """
+    Ha a data/ mappa üres (pl. első Docker indítás), automatikusan
+    letölti a PDF szabályzatokat a scraper segítségével.
+    Sikertelen letöltés esetén st.stop()-pal leállítja az alkalmazást.
+    """
+    pdf_dir = config.PDF_DATA_PATH
+    has_pdfs = (
+        os.path.isdir(pdf_dir)
+        and any(f.lower().endswith(".pdf") for f in os.listdir(pdf_dir))
+    )
+    if has_pdfs:
+        return True
+
+    with st.spinner(
+        "Első indítás érzékelve: Szabályzatok letöltése "
+        "és vektoradatbázis építése..."
+    ):
+        project_root = os.path.dirname(
+            os.path.dirname(os.path.abspath(__file__))
+        )
+        scraper_script = os.path.join(
+            project_root, "app", "utils", "scraping.py"
+        )
+
+        try:
+            result = subprocess.run(
+                [sys.executable, scraper_script],
+                capture_output=True,
+                text=True,
+                timeout=300,
+                cwd=project_root,
+            )
+        except subprocess.TimeoutExpired:
+            st.error(
+                "A letöltés időtúllépés miatt megszakadt. "
+                "Ellenőrizd a hálózati kapcsolatot, "
+                "majd indítsd újra az alkalmazást."
+            )
+            st.stop()
+        except FileNotFoundError:
+            st.error(
+                f"Nem található a Python futtatható: {sys.executable}"
+            )
+            st.stop()
+        except Exception as e:
+            st.error(f"Váratlan hiba a letöltés indításakor: {e}")
+            st.stop()
+
+        if result.returncode != 0:
+            st.error(
+                "Hiba a szabályzatok letöltése közben:\n\n"
+                f"```\n{result.stderr or result.stdout}\n```"
+            )
+            st.stop()
+
+        has_pdfs = (
+            os.path.isdir(pdf_dir)
+            and any(f.lower().endswith(".pdf") for f in os.listdir(pdf_dir))
+        )
+        if not has_pdfs:
+            st.error(
+                "A letöltés lefutott, de nem találhatók PDF fájlok "
+                "a data/ mappában. Ellenőrizd a scraper kimenetét:\n\n"
+                f"```\n{result.stdout}\n```"
+            )
+            st.stop()
+
+    return True
+
+
+@st.cache_resource
 def get_db():
     return rag_engine.build_or_load_vectorstore()
 
@@ -35,7 +110,9 @@ def get_ai():
 with st.sidebar:
     st.markdown("## Műveletek")
     if st.button("🔄 Adatbázis újraindítása"):
+        ensure_data_folder.clear()
         get_db.clear()
+        get_ai.clear()
         st.cache_resource.clear()
         st.rerun()
     st.caption("Új PDF-ek hozzáadása után használd ezt a gombot.")
@@ -52,10 +129,16 @@ with col2:
     st.caption("RAG alapú chatbot a Debreceni Egyetem szabályzataihoz")
 
 # --- Init resources ---
+ensure_data_folder()
 vectorstore = get_db()
 llm = get_ai()
 retriever = vectorstore.as_retriever(
-    search_kwargs={"k": config.NUM_RETRIEVED_DOCS}
+    search_type="mmr",
+    search_kwargs={
+        "k": config.MMR_K,
+        "fetch_k": config.MMR_FETCH_K,
+        "lambda_mult": config.MMR_LAMBDA,
+    },
 )
 
 # --- Chat history ---
@@ -73,14 +156,10 @@ if prompt := st.chat_input("Kérdezz a szabályzatokról..."):
         st.write(prompt)
 
     with st.chat_message("assistant"):
-        placeholder = st.empty()
-
         try:
             with st.spinner("Keresés a szabályzatokban..."):
                 docs = retriever.invoke(prompt)
-                context = (
-                    rag_engine.format_docs(docs) if docs else "Nincs információ."
-                )
+                context = rag_engine.format_docs(docs)
 
                 history = st.session_state.messages[-11:-1]
                 history_str = "\n".join(
@@ -88,28 +167,50 @@ if prompt := st.chat_input("Kérdezz a szabályzatokról..."):
                 )
 
                 template = textwrap.dedent(f"""
-                Te vagy az Unibot, a Debreceni Egyetem segédje.
-                Válaszolj a kérdésre kizárólag a megadott szabályzatok alapján.
-                Ha a szabályzatok nem tartalmaznak releváns információt,
-                mondd meg őszintén, hogy nem tudsz válaszolni.
+                Te az "Unibot" vagy, a Debreceni Egyetem hallgatói AI
+                asszisztense. Tegeződve, lazán, barátságosan, de
+                tisztelettudóan kommunikálsz. Rövid, tömör, magyar
+                egyetemista szóhasználattal válaszolj — nem jogi
+                szakzsargonnal, de nem is slamposan.
 
-                Előzmények:
+                --- ALAPVETŐ TÁRSALGÁS ---
+                Ha a felhasználó üzenete csak köszönés, bemutatkozás,
+                vagy általános érdeklődés (pl. "Mit tudsz?"), NE
+                hivatkozz az alábbi forrásokra. Röviden mutatkozz be
+                és ajánld fel a segítséged.
+
+                --- HIVATALOS SZABÁLYZATI KÉRDÉSEK ---
+                Ha konkrét kérdés érkezik tanulmányi ügyekről,
+                vizsgákról, szabályzatokról, felvételiről, kollégiumról,
+                ösztöndíjról, doktori képzésről stb., SZIGORÚAN az
+                alábbi szabályzatok alapján válaszolj.
+
+                FONTOS SZABÁLYOK:
+                - Mindig jelöld meg zárójelben, melyik szabályzatból
+                  származik az információ, pl. "(Forrás: Tanulmányi és
+                  Vizsgaszabályzat)".
+                - Ha a szabályzatokban NINCS releváns információ,
+                  mondd meg őszintén, és javasold a Tanulmányi Osztály
+                  vagy az illetékes dékáni hivatal felkeresését.
+                - NE találj ki semmit, amit a források nem támasztanak
+                  alá!
+
+                --- EDDIGI BESZÉLGETÉS ---
                 {history_str}
 
-                Szabályzatok (Forrás):
+                --- EGYETEMI SZABÁLYZATOK (HITELES FORRÁSOK) ---
                 {context}
 
-                Kérdés: {prompt}
+                --- KÉRDÉS ---
+                {prompt}
                 """)
 
-                resp = llm.invoke(template)
-                ans = resp.content if hasattr(resp, "content") else str(resp)
+            stream = llm.stream(template)
+            ans = st.write_stream(stream)
 
         except Exception as e:
             st.error(f"Hiba történt: {e}")
             ans = "Bocs, valami félrement."
-
-        placeholder.write(ans)
 
     if "hiba" not in ans.lower() and "félrement" not in ans.lower():
         st.session_state.messages.append({"role": "assistant", "content": ans})

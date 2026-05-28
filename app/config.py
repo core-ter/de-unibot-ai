@@ -15,9 +15,18 @@ VEKTOR_DB_MAPPA = os.path.join(BASE_DIR, "chroma_db")
 # 384 dimenziós vektort ad, sebessége összemérhető az angol only változattal.
 EMBEDDING_MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 GENERATIVE_MODEL_NAME = "gemini-2.5-flash"
-LLM_TEMPERATURE = 0.1
+LLM_TEMPERATURE = 0.0
+LLM_MAX_OUTPUT_TOKENS = 2048
 
-NUM_RETRIEVED_DOCS = 25
+# --- Retrieval (MMR) ---
+# fetch_k: hány dokumentumot kérünk le első körben (nagyobb = jobb lefedettség)
+# k:       hányat tartunk meg diverzifikálás után (kisebb = kevesebb zaj, olcsóbb)
+# lambda:  0.0 = max diverzitás, 1.0 = max hasonlóság
+MMR_FETCH_K = 30
+MMR_K = 8
+MMR_LAMBDA = 0.5
+
+NUM_RETRIEVED_DOCS = MMR_FETCH_K  # backward compat, az mmr fetch_k-t használjuk
 
 # Chunking: jogi/egyetemi szövegekhez igazított értékek.
 # A nagyobb chunk (1500) megőrzi a szabályzatpontok teljes kontextusát,

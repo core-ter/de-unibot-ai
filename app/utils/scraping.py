@@ -10,8 +10,6 @@ URL = "https://unideb.hu/szabalyzatok"
 current_file_path = os.path.abspath(__file__)
 current_dir_path = os.path.dirname(current_file_path)
 PROJECT_ROOT = os.path.dirname(os.path.dirname(current_dir_path))
-if os.path.basename(PROJECT_ROOT) == "app":
-    PROJECT_ROOT = os.path.dirname(PROJECT_ROOT)
 
 DOWNLOAD_DIR = os.path.join(PROJECT_ROOT, "data")
 MANIFEST_PATH = os.path.join(DOWNLOAD_DIR, "download_manifest.json")

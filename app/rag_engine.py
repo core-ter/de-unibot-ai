@@ -57,7 +57,17 @@ def _get_splitter() -> RecursiveCharacterTextSplitter:
 
 
 def format_docs(docs: List[Document]) -> str:
-    return "\n\n---\n\n".join(doc.page_content for doc in docs)
+    parts = []
+    seen = set()
+    for i, doc in enumerate(docs, 1):
+        src = doc.metadata.get("source_file") or doc.metadata.get("source", "")
+        fname = os.path.basename(src)
+        chunk = doc.page_content.strip()
+        if not chunk or chunk in seen:
+            continue
+        seen.add(chunk)
+        parts.append(f"[FORRÁS: {fname}]\n{chunk}")
+    return "\n\n---\n\n".join(parts) if parts else "Nincs információ."
 
 
 def get_embedding_model() -> HuggingFaceEmbeddings:
@@ -68,7 +78,9 @@ def get_llm() -> ChatGoogleGenerativeAI:
     if not config.GOOGLE_API_KEY:
         raise ValueError("Missing GOOGLE_API_KEY in .env")
     return ChatGoogleGenerativeAI(
-        model=config.GENERATIVE_MODEL_NAME, temperature=config.LLM_TEMPERATURE
+        model=config.GENERATIVE_MODEL_NAME,
+        temperature=config.LLM_TEMPERATURE,
+        max_output_tokens=config.LLM_MAX_OUTPUT_TOKENS,
     )
 
 
