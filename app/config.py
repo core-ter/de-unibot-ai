@@ -16,7 +16,6 @@ VEKTOR_DB_MAPPA = os.path.join(BASE_DIR, "chroma_db")
 EMBEDDING_MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 GENERATIVE_MODEL_NAME = "gemini-2.5-flash"
 LLM_TEMPERATURE = 0.0
-LLM_MAX_OUTPUT_TOKENS = 2048
 
 # --- Retrieval (MMR) ---
 # fetch_k: hány dokumentumot kérünk le első körben (nagyobb = jobb lefedettség)

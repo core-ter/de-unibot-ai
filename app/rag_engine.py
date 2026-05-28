@@ -80,7 +80,6 @@ def get_llm() -> ChatGoogleGenerativeAI:
     return ChatGoogleGenerativeAI(
         model=config.GENERATIVE_MODEL_NAME,
         temperature=config.LLM_TEMPERATURE,
-        max_output_tokens=config.LLM_MAX_OUTPUT_TOKENS,
     )
 
 

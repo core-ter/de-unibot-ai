@@ -14,14 +14,53 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-    .stApp { background-color: #0e1117; color: #ffffff; }
+    .stApp {
+        background-color: #0e1117;
+        color: #ffffff;
+    }
     .stChatInput input {
         background-color: #262730 !important;
         color: #fff !important;
         border: 1px solid #4e5d6c !important;
     }
+
+    /* --- Streamlit márkajelzések elrejtése --- */
+    #MainMenu          { visibility: hidden; }
+    .stDeployButton    { visibility: hidden; }
+    footer             { visibility: hidden; }
+    header[data-testid="stHeader"] { visibility: hidden; }
+
+    /* --- Üdvözlő szekció --- */
+    .welcome-box {
+        text-align: center;
+        padding: 2rem 0;
+    }
+    .welcome-box h1 {
+        font-size: 3rem;
+        margin-bottom: 0.25rem;
+    }
+    .welcome-box p {
+        color: #a0aec0;
+        font-size: 1.1rem;
+    }
     </style>
 """, unsafe_allow_html=True)
+
+SUGGESTED_QUESTIONS = [
+    "Hogyan működik a vizsgajelentkezés folyamata?",
+    "Mik a kollégiumi házirend főbb pontjai?",
+    "Milyen ösztöndíjak érhetők el a hallgatóknak?",
+]
+
+AVATAR_USER = "https://api.dicebear.com/7.x/notionists/svg?seed=Debrecen"
+AVATAR_UNIBOT = "https://api.dicebear.com/7.x/bottts/svg?seed=Unibot&baseColor=1D4ED8"
+
+
+def _stream_tokens(llm_stream):
+    for chunk in llm_stream:
+        text = getattr(chunk, "content", "")
+        if text:
+            yield text
 
 
 @st.cache_resource
@@ -118,15 +157,12 @@ with st.sidebar:
     st.caption("Új PDF-ek hozzáadása után használd ezt a gombot.")
 
 # --- Header ---
-col1, col2 = st.columns([1, 5])
-with col1:
-    st.image(
-        "https://unideb.hu/sites/default/files/upload_documents/de_cimer_sarga_kek_0.png",
-        width=80,
-    )
-with col2:
-    st.title("Unibot AI")
-    st.caption("RAG alapú chatbot a Debreceni Egyetem szabályzataihoz")
+st.markdown("""
+    <div class="welcome-box">
+        <h1>🎓 Unibot AI</h1>
+        <p>RAG alapú chatbot a Debreceni Egyetem szabályzataihoz</p>
+    </div>
+""", unsafe_allow_html=True)
 
 # --- Init resources ---
 ensure_data_folder()
@@ -146,16 +182,42 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
+    avatar = AVATAR_USER if msg["role"] == "user" else AVATAR_UNIBOT
+    with st.chat_message(msg["role"], avatar=avatar):
         st.write(msg["content"])
 
+# --- Empty state: üdvözlő üzenet + javasolt kérdések ---
+if not st.session_state.messages:
+    st.markdown(
+        "<p style='text-align:center; color:#a0aec0; margin-top:1.5rem;'>"
+        "Kérdezz bátran az egyetemi szabályzatokról, "
+        "vagy válassz egyet az alábbiak közül:"
+        "</p>",
+        unsafe_allow_html=True,
+    )
+    cols = st.columns(3)
+    for i, question in enumerate(SUGGESTED_QUESTIONS):
+        with cols[i]:
+            if st.button(question, key=f"suggest_{i}", use_container_width=True):
+                st.session_state.pending_prompt = question
+                st.rerun()
+
 # --- User input ---
-if prompt := st.chat_input("Kérdezz a szabályzatokról..."):
+# A st.chat_input NEM lehet feltételes blokkban – minden rendereléskor
+# hívni kell, különben a widget eltűnik a DOM-ból.
+user_input = st.chat_input("Kérdezz a szabályzatokról...")
+
+prompt = user_input
+if "pending_prompt" in st.session_state and st.session_state.pending_prompt:
+    prompt = st.session_state.pending_prompt
+    st.session_state.pending_prompt = None
+
+if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
+    with st.chat_message("user", avatar=AVATAR_USER):
         st.write(prompt)
 
-    with st.chat_message("assistant"):
+    with st.chat_message("assistant", avatar=AVATAR_UNIBOT):
         try:
             with st.spinner("Keresés a szabályzatokban..."):
                 docs = retriever.invoke(prompt)
@@ -205,7 +267,7 @@ if prompt := st.chat_input("Kérdezz a szabályzatokról..."):
                 {prompt}
                 """)
 
-            stream = llm.stream(template)
+            stream = _stream_tokens(llm.stream(template))
             ans = st.write_stream(stream)
 
         except Exception as e:
