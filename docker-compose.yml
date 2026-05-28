@@ -1,0 +1,18 @@
+# ------------------------------------------------------------------
+# Unibot AI – docker-compose.yml
+# Perzisztens volume-ök a chroma_db/ és data/ könyvtárakhoz,
+# .env fájl automatikus betöltése a GOOGLE_API_KEY-hez.
+# ------------------------------------------------------------------
+
+services:
+  unibot:
+    build: .
+    container_name: unibot-ai
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    volumes:
+      - ./chroma_db:/app/chroma_db
+      - ./data:/app/data
+    restart: unless-stopped
