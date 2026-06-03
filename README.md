@@ -9,7 +9,6 @@
 <p align="center">
   <img src="images/1.gif" alt="Unibot AI Dark Mode Demo" width="800">
 </p>
----
 
 ## 📖 Áttekintés
 
