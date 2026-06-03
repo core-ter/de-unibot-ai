@@ -9,9 +9,6 @@
 <p align="center">
   <img src="images/1.gif" alt="Unibot AI Dark Mode Demo" width="800">
 </p>
-
-> Sötét módos Streamlit felület előre definiált gyorsgombokkal, azonnali szabályzatalapú válaszokkal.
-
 ---
 
 ## 📖 Áttekintés
@@ -183,7 +180,3 @@ Felhasználói kérdés
 Ez a projekt az [MIT License](LICENSE) alatt áll — szabadon használható, módosítható és terjeszthető, a licensz feltételeinek megtartása mellett.
 
 ---
-
-<p align="center">
-  <sub>Készítette <strong>Fenti</strong> — Debreceni Egyetem, 2025</sub>
-</p>
