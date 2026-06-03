@@ -24,11 +24,56 @@ st.markdown("""
         border: 1px solid #4e5d6c !important;
     }
 
-    /* --- Streamlit márkajelzések elrejtése --- */
-    #MainMenu          { visibility: hidden; }
-    .stDeployButton    { visibility: hidden; }
-    footer             { visibility: hidden; }
-    header[data-testid="stHeader"] { visibility: hidden; }
+    /* --- Streamlit branding elrejtése --- */
+    #MainMenu                    { visibility: hidden; display: none; }
+    .stDeployButton              { visibility: hidden; display: none; }
+    footer                       { visibility: hidden; }
+
+    /* --- Sidebar: minden gomb tiszta szövegként --- */
+    section[data-testid="stSidebar"] .stButton > button {
+        background: transparent !important;
+        border: none !important;
+        padding: 0.12rem 0.4rem;
+        font-size: 0.84rem;
+        color: #c8cdd5;
+        border-radius: 5px;
+        min-height: unset;
+        line-height: 1.4;
+        text-align: left;
+        box-shadow: none !important;
+    }
+    section[data-testid="stSidebar"] .stButton > button:hover {
+        background: rgba(255, 255, 255, 0.05) !important;
+        color: #ffffff;
+    }
+
+    /* --- Session sor: ikon oszlopok (✏️ 🗑️) alapból halványak --- */
+    section[data-testid="stSidebar"]
+        [data-testid="stVerticalBlockBorderWrapper"]
+        [data-testid="column"]:nth-child(2) button,
+    section[data-testid="stSidebar"]
+        [data-testid="stVerticalBlockBorderWrapper"]
+        [data-testid="column"]:nth-child(3) button {
+        opacity: 0.12;
+        transition: opacity 0.2s ease;
+    }
+    section[data-testid="stSidebar"]
+        [data-testid="stVerticalBlockBorderWrapper"]:hover button {
+        opacity: 1 !important;
+    }
+
+    /* --- "Új beszélgetés" gomb --- */
+    section[data-testid="stSidebar"] .stButton > button[kind="secondary"] {
+        background: #1a1d2a !important;
+        border: 1px solid #4a4f60 !important;
+        color: #ffffff !important;
+        text-align: center !important;
+        padding: 0.35rem 0.5rem !important;
+    }
+    section[data-testid="stSidebar"] .stButton > button[kind="secondary"]:hover {
+        background: #1e3a5f !important;
+        border-color: #3b82f6 !important;
+    }
 
     /* --- Üdvözlő szekció --- */
     .welcome-box {
@@ -145,16 +190,92 @@ def get_ai():
     return rag_engine.get_llm()
 
 
+def _delete_session(name):
+    del st.session_state.chat_sessions[name]
+    st.session_state.pop("editing_chat", None)
+    if st.session_state.current_chat == name:
+        keys = list(st.session_state.chat_sessions.keys())
+        if keys:
+            st.session_state.current_chat = keys[0]
+        else:
+            fallback = "Új beszélgetés 1"
+            st.session_state.chat_sessions[fallback] = []
+            st.session_state.current_chat = fallback
+    st.rerun()
+
+
 # --- Sidebar ---
 with st.sidebar:
-    st.markdown("## Műveletek")
-    if st.button("🔄 Adatbázis újraindítása"):
-        ensure_data_folder.clear()
-        get_db.clear()
-        get_ai.clear()
-        st.cache_resource.clear()
+    if "chat_sessions" not in st.session_state:
+        st.session_state.chat_sessions = {"Új beszélgetés 1": []}
+        st.session_state.current_chat = "Új beszélgetés 1"
+
+    # --- Új beszélgetés ---
+    st.markdown(
+        "<p style='margin-bottom:0.2rem; font-weight:600; font-size:0.72rem; "
+        "color:#6b7280; letter-spacing:0.06em;'>BESZÉLGETÉSEK</p>",
+        unsafe_allow_html=True,
+    )
+    if st.button("+ Új beszélgetés", type="secondary", use_container_width=True):
+        existing = [
+            k for k in st.session_state.chat_sessions
+            if k.startswith("Új beszélgetés ")
+        ]
+        nums = [
+            int(k.rsplit(" ", 1)[-1]) for k in existing
+            if k.rsplit(" ", 1)[-1].isdigit()
+        ]
+        next_num = max(nums) + 1 if nums else 1
+        new_name = f"Új beszélgetés {next_num}"
+        st.session_state.chat_sessions[new_name] = []
+        st.session_state.current_chat = new_name
         st.rerun()
-    st.caption("Új PDF-ek hozzáadása után használd ezt a gombot.")
+
+    st.markdown("---")
+
+    # --- Beszélgetés lista ---
+    for name in list(st.session_state.chat_sessions.keys()):
+        editing = st.session_state.get("editing_chat") == name
+        active = name == st.session_state.current_chat
+
+        with st.container(border=True):
+            if editing:
+                new_name = st.text_input(
+                    "",
+                    value=name,
+                    key=f"rename_{name}",
+                    label_visibility="collapsed",
+                )
+                c_save, c_cancel = st.columns(2)
+                with c_save:
+                    if st.button("✅", key=f"save_{name}", use_container_width=True):
+                        trimmed = new_name.strip()
+                        if trimmed and trimmed != name and trimmed not in st.session_state.chat_sessions:
+                            st.session_state.chat_sessions[trimmed] = (
+                                st.session_state.chat_sessions.pop(name)
+                            )
+                            if active:
+                                st.session_state.current_chat = trimmed
+                        st.session_state.pop("editing_chat", None)
+                        st.rerun()
+                with c_cancel:
+                    if st.button("❌", key=f"cancel_{name}", use_container_width=True):
+                        st.session_state.pop("editing_chat", None)
+                        st.rerun()
+            else:
+                label = f"▸ {name}" if active else name
+                c1, c2, c3 = st.columns([0.6, 0.2, 0.2])
+                with c1:
+                    if st.button(label, key=f"session_{name}", use_container_width=True):
+                        st.session_state.current_chat = name
+                        st.rerun()
+                with c2:
+                    if st.button("✏️", key=f"edit_{name}"):
+                        st.session_state.editing_chat = name
+                        st.rerun()
+                with c3:
+                    if st.button("🗑️", key=f"del_{name}"):
+                        _delete_session(name)
 
 # --- Header ---
 st.markdown("""
@@ -178,16 +299,15 @@ retriever = vectorstore.as_retriever(
 )
 
 # --- Chat history ---
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+messages = st.session_state.chat_sessions[st.session_state.current_chat]
 
-for msg in st.session_state.messages:
+for msg in messages:
     avatar = AVATAR_USER if msg["role"] == "user" else AVATAR_UNIBOT
     with st.chat_message(msg["role"], avatar=avatar):
         st.write(msg["content"])
 
 # --- Empty state: üdvözlő üzenet + javasolt kérdések ---
-if not st.session_state.messages:
+if not messages:
     st.markdown(
         "<p style='text-align:center; color:#a0aec0; margin-top:1.5rem;'>"
         "Kérdezz bátran az egyetemi szabályzatokról, "
@@ -203,8 +323,6 @@ if not st.session_state.messages:
                 st.rerun()
 
 # --- User input ---
-# A st.chat_input NEM lehet feltételes blokkban – minden rendereléskor
-# hívni kell, különben a widget eltűnik a DOM-ból.
 user_input = st.chat_input("Kérdezz a szabályzatokról...")
 
 prompt = user_input
@@ -213,7 +331,7 @@ if "pending_prompt" in st.session_state and st.session_state.pending_prompt:
     st.session_state.pending_prompt = None
 
 if prompt:
-    st.session_state.messages.append({"role": "user", "content": prompt})
+    messages.append({"role": "user", "content": prompt})
     with st.chat_message("user", avatar=AVATAR_USER):
         st.write(prompt)
 
@@ -223,7 +341,7 @@ if prompt:
                 docs = retriever.invoke(prompt)
                 context = rag_engine.format_docs(docs)
 
-                history = st.session_state.messages[-11:-1]
+                history = messages[-11:-1]
                 history_str = "\n".join(
                     f"{m['role']}: {m['content']}" for m in history
                 )
@@ -275,6 +393,6 @@ if prompt:
             ans = "Bocs, valami félrement."
 
     if "hiba" not in ans.lower() and "félrement" not in ans.lower():
-        st.session_state.messages.append({"role": "assistant", "content": ans})
-        if len(st.session_state.messages) > 50:
-            st.session_state.messages = st.session_state.messages[-50:]
+        messages.append({"role": "assistant", "content": ans})
+        if len(messages) > 50:
+            st.session_state.chat_sessions[st.session_state.current_chat] = messages[-50:]
